@@ -25,7 +25,7 @@ int main()
     catch (SocketException &e)
     {
         // error --- output the message
-        e.Report();
+        e.report();
     }
     return 0;
 }

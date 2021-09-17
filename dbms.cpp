@@ -3,6 +3,7 @@
 #include <string>
 #include <iostream>
 #include <fstream>
+#include <algorithm>
 
 void Xception::report()
 {
@@ -37,6 +38,9 @@ Xception::Xception(table_exception_code errcode)
         break;
     case X_CHANGE:
         Message = "Can not change a field, because it has different type";
+        break;
+    case X_RM:
+        Message = "Can not remove the table";
         break;
     default:
         break;
@@ -196,9 +200,6 @@ void ITableStruct::print()
 
 ITable::ITable(const std::string filename)
 {
-    cur_line = 0;
-    cur_size = 0;
-    capacity = 0;
     std::ifstream fin(filename);
     if (!fin.is_open())
     {
@@ -214,14 +215,8 @@ ITable::ITable(const std::string filename)
 
     if (word.size() == 0)
     {
-        //there is no column, getting the number of lines;
-        while (!fin.eof())
-        {
-            getline(fin, word, '\n');
-            Add_line();
-        }
+        //there is no column
         fin.close();
-        // count is a nummber of columns in the table
     }
     else
     {
@@ -229,22 +224,37 @@ ITable::ITable(const std::string filename)
         //header
         while (end < word.size())
         {
-            while (word[end] != ':')
+            while ((end < word.size()) && (word[end] != ':'))
                 end++;
+            if ((end == word.size()))
+                break;
             std::string tmp;
             tmp.insert(0, word, start, end - start);
             if (word[end + 1] == '0' + TEXT)
             {
                 heading.AddText(tmp);
+                std::string field_size = "";
+                end += 3;
+                while (isdigit(word[end]))
+                {
+                    field_size.push_back(word[end]);
+                    end++;
+                }
+                text_fields_sizes.push_back(atol(field_size.c_str()));
+                start = end + 1;
             }
             else
             {
                 heading.AddLong(tmp);
+                start = end + 3;
             }
-            start = end + 3;
             end = start;
         }
+        /*
         heading.print();
+        for (size_t i = 0; i < text_fields_sizes.size(); i++)
+            std::cout << " " << text_fields_sizes[i];
+        std::cout << std::endl;*/
         size_t cur_line_ = 0;
         while (!fin.eof())
         {
@@ -301,26 +311,30 @@ ITable ITable::Open(const std::string filename)
     return tmp;
 };
 
-void ITable::ReadFirst()
+void ITable::SetName(const std::string &title)
 {
-    cur_line = 0;
+    heading.SetTableName(title);
     return;
 };
 
-void ITable::ReadNext()
+std::string ITable::GetName() {
+    return heading.get_table_name();
+};
+
+void ITable::AddTitle(Type t, const std::string &title, size_t size)
 {
-    if (cur_line == cur_size)
+    if (t == TEXT)
     {
-        throw Xception(X_REACHEND);
-        ;
+        heading.AddText(title);
+        text_fields_sizes.push_back(size);
     }
-    cur_line++;
-    return;
+    else
+        heading.AddLong(title);
 };
 
 void ITable::AddText(const std::string &val, const std::string &title, const size_t line)
 {
-    if (line > cur_size)
+    if (line >= fields.size())
     {
         throw Xception(X_LNEXIST);
     }
@@ -338,7 +352,7 @@ void ITable::AddText(const std::string &val, const std::string &title, const siz
 
 void ITable::AddLong(const long &val, const std::string &title, const size_t line)
 {
-    if (line > cur_size)
+    if (line >= fields.size())
     {
         throw Xception(X_LNEXIST);
     }
@@ -351,6 +365,22 @@ void ITable::AddLong(const long &val, const std::string &title, const size_t lin
         }
     }
     throw Xception(X_NEXIST);
+    return;
+};
+
+void ITable::AddText(const std::string &val, const size_t i)
+{
+    //std::cout << "fields.size() = " << fields.size() << std::endl;
+    size_t j = fields[fields.size() - 1][i]; // index in the text fields' array
+    text_fields[j].Change_field_t(val);
+    return;
+};
+
+void ITable::AddLong(const long &val, const size_t i)
+{
+    //std::cout << "fields.size() = " << fields.size() << std::endl;
+    size_t j = fields[fields.size() - 1][i]; // index in the long fields' array
+    long_fields[j].Change_field_l(val);
     return;
 };
 
@@ -389,14 +419,18 @@ Type ITable::GetFieldType(const std::string &Name)
         throw Xception(X_NEXIST);
 };
 
+Type ITable::GetFieldType(size_t i)
+{
+    if (i > heading.get_num_fields())
+        throw Xception(X_NEXIST);
+    return heading.GetType(i);
+};
+
 void ITable::Add_line()
 { // add a line
     std::vector<size_t> tmp_vec;
-    if (cur_size == capacity)
-    {
-        capacity = (capacity + 1) * 2;
-        fields.resize(capacity, tmp_vec);
-    }
+    fields.push_back({0});
+    size_t cur_size = fields.size() - 1;
     fields[cur_size].resize(heading.get_num_fields(), 0);
     for (size_t i = 0; i < heading.get_num_fields(); i++)
     {
@@ -413,48 +447,18 @@ void ITable::Add_line()
             fields[cur_size][i] = long_fields.size() - 1;
         }
     }
-    cur_size++;
     return;
 };
 
 void ITable::Delete_line(const size_t line)
 { //delete a line
-    if (cur_size < line)
+    if (fields.size() - 1 < line)
     {
         throw Xception(X_LNEXIST);
     }
-    if (cur_size == 0)
+    if (fields.size() == 0)
     {
         throw Xception(X_EMPTY);
-    }
-    cur_size--;
-    size_t text_delete = 0, long_delete = 0;
-    for (size_t i = 0; i < heading.get_num_fields(); i++)
-    {
-        if (heading.GetType(i) == TEXT)
-        {
-            text_fields.erase(text_fields.begin() + fields[line][i]);
-            text_delete++;
-        }
-        else
-        {
-            long_fields.erase(long_fields.begin() + fields[line][i]);
-            long_delete++;
-        }
-    }
-    for (size_t i = line; i < fields.size(); i++)
-    {
-        for (size_t j = 0; j < heading.get_num_fields(); j++)
-        {
-            if (heading.GetType(j) == TEXT)
-            {
-                fields[i][j] -= text_delete;
-            }
-            else
-            {
-                fields[i][j] -= long_delete;
-            }
-        }
     }
     fields.erase(fields.begin() + line);
     return;
@@ -508,6 +512,32 @@ void ITable::Delete_Column(const Type t, const std::string &Name)
     }
     throw Xception(X_NEXIST);
     return;
+};
+
+void ITable::Delete_Empty()
+{
+    for (long int i = fields.size() - 2; i >= 0; i--)
+    {
+        for (size_t j = 0; j < heading.get_num_fields(); j++)
+        {
+            if ((fields[i][j] < text_fields.size()) && (heading.GetType(j) == TEXT))
+            {
+                if (!text_fields[fields[i][j]].isInit())
+                {
+                    Delete_line(i);
+                    break;
+                }
+            }
+            else if ((fields[i][j] < long_fields.size()) && (heading.GetType(j) == LONG))
+            {
+                if (!long_fields[fields[i][j]].isInit())
+                {
+                    Delete_line(i);
+                    break;
+                }
+            }
+        }
+    }
 };
 
 void ITable::Add_Column(const Type t, const std::string &Name)
@@ -578,38 +608,96 @@ void ITable::ToFile(const std::string &filename)
         throw Xception(X_OPEN);
     }
     fout << heading.get_table_name() << std::endl;
+    size_t text_size_i = 0;
     for (size_t i = 0; i < heading.get_num_fields(); i++)
     {
-        fout << heading.get_field_name(i) << ":" << heading.GetType(i) << "\t";
+        fout << heading.get_field_name(i) << ":" << heading.GetType(i);
+        if (heading.GetType(i) == TEXT)
+        {
+            fout << ":" << text_fields_sizes[text_size_i];
+            text_size_i++;
+        }
+        fout << "\t";
     }
     fout << std::endl;
-    for (size_t i = 0; i < fields.size() - 1; i++)
+    if (fields.size() > 1)
     {
-        for (size_t j = 0; j < heading.get_num_fields(); j++)
+        std::cout << "fields.size = " << fields.size();
+        std::cout << ", " << fields[0].size() << std::endl;
+        for (size_t i = 0; i < fields.size() - 1; i++)
         {
-            //fout << "converting " << fields[i][j] << ":" << heading.GetType(j) << std::endl;
-            if ((fields[i][j] < text_fields.size()) && (heading.GetType(j) == TEXT))
+            for (size_t j = 0; j < heading.get_num_fields(); j++)
             {
-                if (text_fields[fields[i][j]].isInit())
+                //fout << "converting " << fields[i][j] << ":" << heading.GetType(j) << std::endl;
+                if ((fields[i][j] < text_fields.size()) && (heading.GetType(j) == TEXT))
                 {
-                    fout << text_fields[fields[i][j]].GetElem();
+                    if (text_fields[fields[i][j]].isInit())
+                    {
+                        fout << text_fields[fields[i][j]].GetElem();
+                    }
+                    fout << "\t";
                 }
-                fout << "\t";
-            }
-            else if ((fields[i][j] < long_fields.size()) && (heading.GetType(j) == LONG))
-            {
-                if (long_fields[fields[i][j]].isInit())
+                else if ((fields[i][j] < long_fields.size()) && (heading.GetType(j) == LONG))
                 {
-                    fout << long_fields[fields[i][j]].GetElem();
+                    if (long_fields[fields[i][j]].isInit())
+                    {
+                        fout << long_fields[fields[i][j]].GetElem();
+                    }
+                    fout << "\t";
                 }
-                fout << "\t";
             }
+            fout << std::endl;
         }
-        fout << std::endl;
     }
     fout.close();
     return;
 };
+
+bool ITable::isTitle(const std::string title)
+{
+    size_t i;
+    for (i = 0; i < heading.get_num_fields(); i++)
+    {
+        if (heading.get_field_name(i) == title)
+            return true;
+    }
+    return false;
+}
+
+size_t ITable::GetNumFields()
+{
+    return heading.get_num_fields();
+}
+
+size_t ITable::GetNumLines () {
+    return fields.size() - 1;
+};
+
+size_t ITable::GetTextSize(size_t i)
+{
+    size_t j = 0, k = 0;
+    while ((k < heading.get_num_fields()) && (j != i))
+    {
+        if (heading.GetType(j) == TEXT)
+            k++;
+        j++;
+    }
+    if (j == i)
+        return text_fields_sizes[k];
+    throw Xception(X_NEXIST);
+};
+
+ size_t ITable::GetTextSize (const std::string &f_name) {
+     size_t j = 0; // index in the array with text fields' length
+     for (size_t i = 0; i < heading.get_num_fields(); i++) {
+         if (heading.GetType(i) == TEXT) {
+            j++;
+            if (heading.get_field_name(i) == f_name) return text_fields_sizes[j];
+         }
+     }
+     return 0;
+ };
+
 
 // utility functions to print the table
 void ITable::Print_field_names()
@@ -620,7 +708,7 @@ void ITable::Print_field_names()
 
 void ITable::Print_line(const size_t line)
 {
-    std::cout << line << "|\t";
+    std::cout << line << "|";
     for (size_t i = 0; i < heading.get_num_fields(); i++)
     {
         if ((fields[line][i] < text_fields.size()) && (heading.GetType(i) == TEXT))
@@ -644,18 +732,62 @@ void ITable::Print_line(const size_t line)
     return;
 };
 
-//prints
-void ITable::Print_line()
-{
-    Print_line(cur_line);
+void ITable::Print_line(const std::vector <std::string> &f_names, const size_t line) {
+    std::cout << line << "| ";
+    for (size_t i = 0; i < heading.get_num_fields(); i++)
+    {
+        if ((fields[line][i] < text_fields.size()) && (heading.GetType(i) == TEXT) && 
+            (std::find(f_names.begin(), f_names.end(), heading.get_field_name(i)) != f_names.end()))
+        {
+            if (text_fields[fields[line][i]].isInit())
+            {
+                std::cout << text_fields[fields[line][i]].GetElem();
+            }
+            std::cout << "\t |";
+        }
+        else if ((fields[line][i] < long_fields.size()) && (heading.GetType(i) == LONG) && 
+            (std::find(f_names.begin(), f_names.end(), heading.get_field_name(i)) != f_names.end()))
+        {
+            if (long_fields[fields[line][i]].isInit())
+            {
+                std::cout << long_fields[fields[line][i]].GetElem();
+            }
+            std::cout << "\t |";
+        }
+    }
+    std::cout << std::endl;
     return;
 };
+
+//prints
 
 void ITable::Print_table()
 {
     std::cout << "________________________________________________________" << std::endl;
     std::cout << "Table parameters: " << heading.get_num_fields() << " * " << fields.size() << std::endl;
     heading.print();
+    /*for (size_t i = 0; i < text_fields_sizes.size(); i++)
+        std::cout << " " << text_fields_sizes[i];
+    std::cout << std::endl;
+    
+    for (size_t i = 0; i < fields.size() - 1; i++)
+    {
+        for (size_t j = 0; j < fields[0].size(); j++)
+        {
+            std::cout << fields[i][j] << " ";
+        }
+        std::cout << std::endl;
+    }
+    for (size_t i = 0; i < text_fields.size(); i++)
+    {
+        std::cout << i << ". " << text_fields[i].GetElem() << std::endl;
+    }
+    std::cout << std::endl;
+    for (size_t i = 0; i < long_fields.size(); i++)
+    {
+        std::cout << i << ". " << long_fields[i].GetElem() << std::endl;
+    }
+    std::cout << std::endl; */
 
     for (size_t i = 0; i < fields.size() - 1; i++)
     {
@@ -663,4 +795,10 @@ void ITable::Print_table()
     }
     std::cout << "________________________________________________________" << std::endl;
     return;
+};
+
+void ITable::Delete_Table(const std::string tname)
+{
+    if (remove(tname.c_str()) != 0)
+        throw Xception(X_RM);
 };

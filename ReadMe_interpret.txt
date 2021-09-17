@@ -1,42 +1,37 @@
+----------------------------------- РУКОВОДСТВО ДЛЯ РАБОТЫ -----------------------------------
 0. Для компиляции напишите "make" в командной строке.
 1. Перед началом работы программы убедитесь, что в папке с исполняемыми файлами client и server
-отсутствует файл "mysocket". 
-2. Запустите сначала процесс сервер с помощью ./Server, затем в другом параллельном процессе 
-запустите клиента ./Client
-3. Для работы с БД пишите нужные команды в процессе клиенте. 
+отсутствует файл "mysocket". При корректной работе (без прерывания работы сервера по ctrl+C) 
+файл ysocket удаляется автоматически
+2. Запустите сначала процесс сервер с помощью ./server, затем в другом параллельном процессе 
+запустите клиента ./client. В начале введите название файла, в который будет записываться 
+результат работы интерпретатора.
+3. Для работы с базой данных* пишите нужные команды** в процессе клиенте. 
+4. Для просмотра результатов работы базы данных введите в командной строке cat имя_файла.
+5. Для работы с базой данных без клиент-серверного взаимодейтсвия, а посредством команд в 
+программе tmp.cpp, пропишите в командной строке ./spm.
 
-
-
-
-
+* для ознакомления с прицнипом работы базы данных прочтите ReadMe.txt
+** примеры команд есть в файле tests.txt
 
 ----------------------------------- ПРИНЦИП РАБОТЫ -----------------------------------
 1. Сервер получает от клиента строку, содержащую команду, и запускает интерпретатор с помощью
 конструктора: Interpreter obj (str);
-2. КОнструктор считывает первое слово из строки: если это слово SELECT, INSERT, UPDATE, DELETE, 
+2. Кoнструктор считывает первое слово из строки: если это слово SELECT, INSERT, UPDATE, DELETE, 
 CREATE или DROP, то вызыаются соответствующие методы интерпретатора (select_sentence() и т.д.),
-иначе генерируется сообщение об ошибке
+иначе генерируется сообщение об ошибке.
+3. Предложения без WHERE-клаузы (create, insert, drop) не требуют дополнительного парсинга и 
+анализируются в цикле непосредственно в командах create_sentence() и т.д.
+4. В WHERE-клаузах требуются лексический и синтаксический анализаторы для обработки самих 
+where-клауз, long-выражений (используются в IN-альтернативе и логических выражений), и для 
+регулярных выражений в LIKE-альтернативе. Для каждого случая создан отдельный namespace со своим
+набором типов лексем и т.д.
+5. После обработки выполняются нужные действия, результат записывается в указанный клиентом файл.
+
+ВНИМАНИЕ!
+В результате работы команд INSERT, UPDATE, DELETE, CREATE и DROP исходная таблица обновляется!
 
 
-
-
-
-
-
-
-
-
-
------------------------------------ ЧТО ГОТОВО -----------------------------------
-1. Скелет программы
-2. Парсеры для long выражений
-3. Парсеры для where-кляузы
-
------------------------------------ ЧТО НЕ ГОТОВО -----------------------------------
-1. Методы класса interpret
-2. Пространство имен parser_where
-3. Классы исключений
-4. Нужно доработать некоторые методы таблицы (конструирование заголовка из строки и тд)
 
 ----------------------------------- ГРАММАТИКА -----------------------------------
 
@@ -45,9 +40,6 @@ S       = SEL | INS | UPD | DEL | CR | DR
 SEL     = 'SELECT' FIELDS 'FROM' id WHERE           создает новую таблицу из отобранных строк и столбцов
 FIELDS  = id {, id} | *
 
-вставляет в конец таблицы <имятаблицы> строку с перечисленным значением полей. 
-Количество полей и их значения должны соответствовать структуре таблицы. В противном 
-случае выдается сообщение об ошибке. 
 INS     = 'INSERT INTO' id (F_VAL {, F_VAL})        вставка в конец таблицы
 F_VAL   = STR | longint
 STR     = symbol {symbol}
@@ -135,21 +127,22 @@ EVAL = '=' | '<' | '>' | '>=' | '<=' | '!='
 	3. namespace parser_long_expr - 
 		- void init (std::string & str)
 		
-		3 functions that call each other recurrently and generate a sentence which will be calculated
-		in the next 3 functions (LONG_SUM, LONG_MULT, LONG_VAL)
-		- std::string A (std::string &);	// operates with + and minus 
-		- std::string B (std::string &);	// operates with *,  %, 
-	  	- std::string C (std::string &);	// operates with brackets, number or long field name
-		 
-		- long A (std::string &, ITable);
-		- long B (std::string &, ITable);
-		- long C (std::string &, IT/,able);
+		Функции, рекуррентно вызывающие друг друга для создания строки, которая затем будет 
+		вычислена функция Al(), Bl() и Cl().
+		- std::string A(std::string &); // processes + | - (S_OP)
+		- std::string B(std::string &); // processes * | / | % (M_OP) and LONG_SUM
+		- std::string C(std::string &); // LONG_MULT, longint, LONG id and brackets (calls A())
+
+		Функции для вычисления long выражений (используются для каждой строки)
+		- long Al(std::string &, ITable &);
+		- long Bl(std::string &, ITable &);
+		- long Cl(std::string &, ITable &);
 	
 	4. namespace lexer_where - для лексических и синтаксических анализаторов where-кляузы
 		
 		- enum where_type_t cur_lex_type_w; // тип 
-		- std::string cur_lex_text_w;	    // current lexem
-		- std::string c_w;		    // 
+		- std::string cur_lex_text_w;	    // предыдущая лексема
+		- std::string c_w;		    // текущая лексема
 		    
 		 -void init (std::string & str)
 		    {
@@ -177,36 +170,34 @@ EVAL = '=' | '<' | '>' | '>=' | '<=' | '!='
 	    - int flag_log = 0;
 	    - int flag_expr = 0;
 	    - enum mode_type mode;
-	    - std::multiset <long> mst_l;
-	    - std::multiset <std::string> mst_s;
+	    - std::multiset <long> mst_l;	 // список числовых констант
+	    - std::multiset <std::string> mst_s; // список строковых констант
 
 	    void init (string & str, ITable bd)
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
+	    
+	    Функции для синтаксического анализа:
+	    - std::string W0(std::string &, ITable &); // beginning of where-clause
+	    - std::string W1(std::string &, ITable &); // LIKE-alternative
+	    - std::string W2(std::string &, ITable &); // IN-alternative
+	    - std::string W3(std::string &, ITable &); // start processing long or logic expressions, call W4
+	    - std::string W4(std::string &, ITable &); // long or logic expressions, call W5 or W7
+	    - std::string W5(std::string &, ITable &); // long or logic expressions, call W3 (if in brackets), W6 or W7
+	    - std::string W6(std::string &, ITable &); // parsing text expression and relations for logic-expr
+	    - std::string W7(std::string &, ITable &); // brackets, call W3
+	    - void W8(std::string &, ITable &);        // list of constants
 
+	    Функции для вычисления логических выражений (используются для каждой строки)
+	    - long W31(std::string &, ITable &); // start funstion
+	    - long W41(std::string &, ITable &);
+	    - long W51(std::string &, ITable &);
+	    - long W71(std::string &, ITable &); // brackets
+	    
+	6. namespace myregex - для обработки регулярных выражений, содержащих символы и служебные символы:
+		%   - any sequence of >= symbols
+		_   - any symbol
+		[]  - any symbol from brackets: [abcdef] of [a-f]
+		[^] - any symbol not from brackets: [^abcdef] of [^a-f]
+		
+	    - bool my_regex_match (std::string reference, std::string check)
+	    возвращает true, если строка check соответствует строке образцу reference
+	

@@ -1,4 +1,7 @@
-#include "sock_wrap.h"
+
+ #include "sock_wrap.h"
+#include "dbms.hpp"
+#include "interpret.hpp"
 #include <fstream>
 
 using namespace ModelSQL;
@@ -26,12 +29,27 @@ public:
             std::cout.rdbuf(out.rdbuf());
             try
             {
+                std::cerr << "'" << str << "'" << std::endl;
+                Interpreter obj(str);
                 pConn->PutString("OK"); // get an answer
             }
             catch (SocketException &e)
             {
                 // error --- input to the screen
-                e.Report();
+                e.report();
+                pConn->PutString (e.Message);
+            }
+            catch (SQL_Xception &e)
+            {
+                // error --- input to the screen
+                e.report();
+                pConn->PutString (e.Message);
+            }
+            catch (Xception &e)
+            {
+                // error --- input to the screen
+                e.report();
+                pConn->PutString (e.Message);
             }
             catch (...)
             {
@@ -41,6 +59,8 @@ public:
         }
         pConn->PutString("END");
         delete pConn;
+        remove (default_address);
+        // delete mysocket
     }
 };
 
@@ -49,13 +69,12 @@ int main()
     try
     {
         MyServerSocket sock;
-        for (;;)
-            sock.OnAccept(sock.Accept());
+        sock.OnAccept(sock.Accept());
     }
     catch (SocketException &e)
     {
         // error --- input to the screen
-        e.Report();
+        e.report();
     }
     return 0;
 }

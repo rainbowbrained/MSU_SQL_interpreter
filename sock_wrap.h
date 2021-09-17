@@ -14,13 +14,13 @@
 namespace ModelSQL 
 {    
     const char *default_address = "mysocket";
-    const char *server_invitation = "Input file name";
+    const char *server_invitation = "Enter the name of the file that will record the result of the work";
     const char *server_stop = "Input 'END' to stop";
     // SocketException --- Exception class
     class SocketException 
     {
     public:
-        std :: string err_message;
+        std :: string Message;
         enum socket_exception_code 
         {
             ESE_SOCKCREATE,
@@ -32,7 +32,7 @@ namespace ModelSQL
             ESE_SOCKACCEPT
         };
         SocketException (socket_exception_code);
-        void Report ();
+        void report ();
     };
     
     // BaseSocket --- basic class fot sockets
@@ -84,32 +84,32 @@ namespace ModelSQL
     {
         switch (errcode) {
             case ESE_SOCKCREATE:
-                err_message = "ERROR: server - unsuccessful 'socket'";
+                Message = "Socket error: server - unsuccessful 'socket'";
                 break;
             case ESE_SOCKCONN:
-                err_message = "ERROR: client - unsuccessful 'connect'";
+                Message = "Socket error: client - unsuccessful 'connect'";
                 break;
             case ESE_SOCKSEND:
-                err_message = "ERROR: unsuccessful 'send'";
+                Message = "Socket error: unsuccessful 'send'";
                 break;
             case ESE_SOCKRECV:
-                err_message = "ERROR: unsuccessful 'recv'";
+                Message = "Socket error: unsuccessful 'recv'";
                 break;
             case ESE_SOCKBIND:
-                err_message = "ERROR: server - unsuccessful 'bind'";
+                Message = "Socket error: server - unsuccessful 'bind'";
                 break;
             case ESE_SOCKLISTEN:
-                err_message = "ERROR: server - unsuccessful 'listen'";
+                Message = "Socket error errorOR: server - unsuccessful 'listen'";
                 break;
             case ESE_SOCKACCEPT:
-                err_message = "ERROR: server - unsuccessful 'accept'";
+                Message = "Socket error: server - unsuccessful 'accept'";
                 break;
         }
     }
     
-    void SocketException :: Report ()
+    void SocketException :: report ()
     {
-        std :: cout << err_message << std :: endl << "Code: " << errno << std :: endl;
+        std :: cout << Message << std :: endl << "Code: " << errno << std :: endl;
         return;
     }
     

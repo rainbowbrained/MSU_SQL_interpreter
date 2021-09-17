@@ -24,13 +24,13 @@ enum table_exception_code
     X_OPEN,
     X_INFO,
     X_CHANGE,
+    X_RM
 };
 
 class Xception
 {
-    std::string Message;
-
 public:
+    std::string Message;
     void report();
     Xception(table_exception_code);
     Xception(const std::string &aMessage) : Message(aMessage){};
@@ -65,7 +65,7 @@ public:
     ITextField(std::string val) : init(1), field(val), field_type(TEXT){};
     void Change_field_l(long val) override
     {
-        throw Xception(X_CHANGE);
+        //throw Xception(X_CHANGE);
         return;
     };
     void Change_field_t(std::string val) override
@@ -96,7 +96,7 @@ public:
     };
     void Change_field_t(std::string val) override
     {
-        throw Xception(X_CHANGE);
+        //throw Xception(X_CHANGE);
         return;
     };
     bool isInit() { return init; };
@@ -135,43 +135,53 @@ class ITable
 {
     ITableStruct heading;
     std::vector<std::vector<size_t>> fields;
-    size_t cur_size;
-    size_t cur_line; // for seeking
-    size_t capacity;
     std::vector<ITextField> text_fields;
+    std::vector<size_t> text_fields_sizes;
     std::vector<ILongField> long_fields;
 
 public:
-    ITable() : cur_size(0), cur_line(0), capacity(0){};
-    ITable(const ITableStruct &other) : heading(other),
-                                        cur_size(0), cur_line(0), capacity(0){};
-    ITable(const ITable &other) : heading(other.heading), fields(other.fields),
-                                  cur_size(other.cur_size), cur_line(0), capacity(other.capacity){};
+    ITable() {};
+    ITable(const ITableStruct &other) : heading(other){};
+    ITable(const ITable &other) : heading(other.heading), fields(other.fields), 
+            text_fields(other.text_fields), text_fields_sizes(other.text_fields_sizes), 
+            long_fields (other.long_fields) {};
 
     ITable(const std::string filename); //import from file
     ITable Open(const std::string filename);
 
+    void SetName(const std::string &title); // set table's name
+    std::string GetName(); // get table's name
+    void AddTitle(Type t, const std::string &title, size_t size);
+
     void AddText(const std::string &val, const std::string &title, const size_t line);
     void AddLong(const long &val, const std::string &title, const size_t line);
+    void AddText(const std::string &val, const size_t i); // insert in the last line
+    void AddLong(const long &val, const size_t i);// insert in the last line
+
     std::string &GetTextField(const std::string &Name, const size_t line);
     long &GetLongField(const std::string &Name, const size_t line);
     Type GetFieldType (const std::string &Name);
+    Type GetFieldType (size_t i);
 
     void Add_line();                     // add a line
     void Delete_line(const size_t line); //delete a line
     void Add_Column(const Type, const std::string &Name);
     void Delete_Column(const Type, const std::string &);
+    void Delete_Empty ();
     void ToFile(const std::string &filename);
-
-    //seeking
-    void ReadFirst();
-    void ReadNext();
 
     // utility functions to print the table
     void Print_field_names();
     void Print_line(const size_t);
-    void Print_line(); // prints current line
+    void Print_line(const std::vector <std::string> &f_names, const size_t);
     void Print_table();
-    // void Delete_Table (std::string tname); // IMPLEMENT!!!
+
+    bool isTitle (const std::string title);
+    size_t GetNumFields (); // num of columns
+    size_t GetNumLines (); // num of rows
+    size_t GetTextSize (size_t i); // index in the header!
+    size_t GetTextSize (const std::string &f_name);
+
+    void Delete_Table (const std::string tname);
 };
 #endif
